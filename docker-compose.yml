@@ -1,0 +1,93 @@
+version: "3.9"
+
+services:
+
+  nginx1:
+    build: ./nginx
+    container_name: nginx1
+    volumes:
+      # OPTION 1 (default Docker volume)
+      # - nginx1_data:/data
+
+      # OPTION 2 (recommended for real disk pressure)
+      - ./real-data/nginx1:/data
+
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    ports:
+      - "8081:80"
+
+  nginx2:
+    build: ./nginx
+    container_name: nginx2
+    volumes:
+      # - nginx2_data:/data
+      - ./real-data/nginx2:/data
+
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    ports:
+      - "8082:80"
+
+  flask:
+    build: ./flask-app
+    container_name: flask-app
+    ports:
+      - "5000:5000"
+    depends_on:
+      - nginx1
+      - nginx2
+    volumes:
+      - ./real-data/nginx1:/data/nginx1
+      - ./real-data/nginx2:/data/nginx2
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    depends_on:
+      - flask
+      - node-exporter
+      - cadvisor
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+
+  node-exporter:
+    image: prom/node-exporter
+    container_name: node-exporter
+    ports:
+      - "9100:9100"
+    restart: always
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor
+    container_name: cadvisor
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /etc/machine-id:/etc/machine-id:ro
+    restart: always
+
+volumes:
+  nginx1_data:
+  nginx2_data:
